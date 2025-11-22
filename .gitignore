@@ -1,0 +1,28 @@
+# Environment variables
+.env
+
+# Deno
+.deno/
+deno.lock
+
+# Generated review files (optional - comment out if you want to commit reviews)
+*.review.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node (in case you use npm packages)
+node_modules/
+package-lock.json
+yarn.lock

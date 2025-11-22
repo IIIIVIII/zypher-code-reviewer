@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐛 Bug Hunt Agent</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-dark: #0a0a0a;
+            --border-green: #00ff00;
+            --text-green: #00ff00;
+            --text-green-dim: #00cc00;
+            --glow-green: 0 0 20px rgba(0, 255, 0, 0.5);
+            --glow-green-intense: 0 0 40px rgba(0, 255, 0, 0.8);
+            --accent-red: #ff3333;
+            --accent-cyan: #00ffff;
+            --accent-yellow: #ffff00;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-dark);
+            color: var(--text-green);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .matrix-bg {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            opacity: 0.03;
+            z-index: 0;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Ctext x='10' y='20' fill='%2300ff00' font-family='monospace' font-size='14'%3E01001%3C/text%3E%3Ctext x='50' y='40' fill='%2300ff00' font-family='monospace' font-size='14'%3E10110%3C/text%3E%3Ctext x='20' y='60' fill='%2300ff00' font-family='monospace' font-size='14'%3E11010%3C/text%3E%3Ctext x='60' y='80' fill='%2300ff00' font-family='monospace' font-size='14'%3E00101%3C/text%3E%3C/svg%3E");
+            animation: matrixScroll 20s linear infinite;
+        }
+
+        @keyframes matrixScroll {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 1000px; }
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 30px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px;
+            border: 2px solid var(--border-green);
+            background: linear-gradient(135deg, rgba(0, 255, 0, 0.05) 0%, rgba(0, 0, 0, 0.8) 100%);
+            box-shadow: var(--glow-green);
+        }
+
+        .header-icon { font-size: 4em; margin-bottom: 10px; }
+
+        .header h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5em;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: var(--glow-green);
+        }
+
+        .header-subtitle {
+            color: var(--text-green-dim);
+            font-size: 1em;
+            margin-top: 10px;
+        }
+
+        .tech-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+            padding: 10px 20px;
+            border: 1px solid var(--border-green);
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        /* Input Section */
+        .input-section {
+            border: 2px solid var(--border-green);
+            background: linear-gradient(180deg, rgba(0, 255, 0, 0.03) 0%, var(--bg-dark) 100%);
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: var(--glow-green);
+        }
+
+        .input-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            font-size: 1.1em;
+            color: var(--text-green);
+        }
+
+        .input-group { margin-bottom: 20px; }
+
+        .file-upload-area {
+            border: 2px dashed var(--border-green);
+            padding: 25px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(0, 255, 0, 0.02);
+        }
+
+        .file-upload-area:hover {
+            background: rgba(0, 255, 0, 0.08);
+        }
+
+        .file-upload-area.has-files {
+            border-style: solid;
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        .upload-icon { font-size: 2.5em; margin-bottom: 10px; }
+
+        input[type="file"] { display: none; }
+
+        .file-list {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .file-tag {
+            padding: 8px 15px;
+            border: 1px solid var(--border-green);
+            background: rgba(0, 255, 0, 0.15);
+            font-size: 0.9em;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            background: var(--bg-dark);
+            border: 2px solid var(--border-green);
+            color: var(--text-green);
+            padding: 15px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        textarea:focus {
+            outline: none;
+            box-shadow: var(--glow-green);
+        }
+
+        textarea::placeholder {
+            color: var(--text-green-dim);
+            opacity: 0.5;
+        }
+
+        /* Hunt Button */
+        .hunt-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            width: 100%;
+            padding: 20px 40px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.3em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: var(--bg-dark);
+            background: var(--text-green);
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: var(--glow-green-intense);
+        }
+
+        .hunt-button:hover:not(:disabled) {
+            transform: scale(1.02);
+            box-shadow: 0 0 50px rgba(0, 255, 0, 0.8);
+        }
+
+        .hunt-button:disabled {
+            background: #004400;
+            color: #006600;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .hunt-button .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #004400;
+            border-top-color: #00ff00;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Progress Section */
+        .progress-section {
+            display: none;
+            border: 2px solid var(--border-green);
+            background: linear-gradient(180deg, rgba(0, 255, 0, 0.03) 0%, var(--bg-dark) 100%);
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: var(--glow-green);
+        }
+
+        .progress-section.active { display: block; }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            text-shadow: var(--glow-green);
+        }
+
+        .progress-log {
+            background: #000;
+            border: 1px solid var(--border-green);
+            padding: 15px;
+            max-height: 250px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+
+        .log-entry {
+            padding: 8px 12px;
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-left: 3px solid;
+        }
+
+        .log-entry.success { border-color: var(--text-green); color: var(--text-green); }
+        .log-entry.info { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .log-entry.warning { border-color: var(--accent-yellow); color: var(--accent-yellow); }
+        .log-entry.error { border-color: var(--accent-red); color: var(--accent-red); }
+        .log-entry.working { border-color: var(--accent-yellow); color: var(--accent-yellow); }
+
+        .log-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Results Section */
+        .results-section {
+            display: none;
+            border: 2px solid var(--border-green);
+            background: linear-gradient(180deg, rgba(0, 255, 0, 0.03) 0%, var(--bg-dark) 100%);
+            box-shadow: var(--glow-green-intense);
+            overflow: hidden;
+        }
+
+        .results-section.active { display: block; }
+
+        .results-header {
+            padding: 25px;
+            border-bottom: 2px solid var(--border-green);
+            background: rgba(0, 255, 0, 0.05);
+        }
+
+        .results-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5em;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: var(--glow-green);
+        }
+
+        .summary-text {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--text-green-dim);
+            font-size: 0.95em;
+            padding: 0 20px;
+        }
+
+        /* Tab Cards */
+        .tabs-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .tab-card {
+            padding: 25px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 3px solid;
+            position: relative;
+        }
+
+        .tab-card.bugs {
+            border-color: var(--accent-red);
+            background: rgba(255, 51, 51, 0.1);
+        }
+
+        .tab-card.bugs:hover, .tab-card.bugs.active {
+            box-shadow: 0 0 30px rgba(255, 51, 51, 0.6);
+            transform: scale(1.02);
+        }
+
+        .tab-card.bugs.active {
+            background: rgba(255, 51, 51, 0.2);
+        }
+
+        .tab-card.fixes {
+            border-color: var(--text-green);
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        .tab-card.fixes:hover, .tab-card.fixes.active {
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.6);
+            transform: scale(1.02);
+        }
+
+        .tab-card.fixes.active {
+            background: rgba(0, 255, 0, 0.2);
+        }
+
+        .tab-icon { font-size: 2.5em; margin-bottom: 10px; }
+
+        .tab-number {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3em;
+            font-weight: 900;
+            text-shadow: 0 0 20px currentColor;
+        }
+
+        .tab-card.bugs .tab-number { color: var(--accent-red); }
+        .tab-card.fixes .tab-number { color: var(--text-green); }
+
+        .tab-label {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85em;
+            margin-top: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.9;
+        }
+
+        .tab-hint {
+            font-size: 0.7em;
+            opacity: 0.6;
+            margin-top: 5px;
+        }
+
+        /* Content Panels */
+        .content-panel {
+            display: none;
+            padding: 25px;
+        }
+
+        .content-panel.active { display: block; }
+
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-green);
+        }
+
+        /* Bug List */
+        .bug-list { display: flex; flex-direction: column; gap: 15px; }
+
+        .bug-item {
+            background: rgba(255, 51, 51, 0.05);
+            border: 1px solid var(--accent-red);
+            border-left: 4px solid var(--accent-red);
+            padding: 15px;
+        }
+
+        .bug-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .bug-title {
+            font-weight: 700;
+            color: var(--accent-red);
+            font-size: 1.1em;
+        }
+
+        .bug-severity {
+            padding: 3px 10px;
+            font-size: 0.75em;
+            text-transform: uppercase;
+            border-radius: 3px;
+        }
+
+        .bug-severity.high { background: var(--accent-red); color: #000; }
+        .bug-severity.medium { background: var(--accent-yellow); color: #000; }
+        .bug-severity.low { background: var(--text-green); color: #000; }
+
+        .bug-location {
+            font-size: 0.85em;
+            color: var(--accent-cyan);
+            margin-bottom: 8px;
+        }
+
+        .bug-problem { margin-bottom: 8px; color: var(--text-green-dim); }
+
+        .bug-cause {
+            font-size: 0.9em;
+            color: var(--accent-yellow);
+            padding-top: 8px;
+            border-top: 1px dashed rgba(255, 255, 0, 0.3);
+        }
+
+        /* Fixed Code */
+        .code-container {
+            background: #000;
+            border: 1px solid var(--border-green);
+            overflow: hidden;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: rgba(0, 255, 0, 0.1);
+            border-bottom: 1px solid var(--border-green);
+        }
+
+        .code-title { font-weight: 700; }
+
+        .copy-btn {
+            padding: 5px 15px;
+            background: var(--text-green);
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            transition: all 0.3s;
+        }
+
+        .copy-btn:hover { box-shadow: 0 0 15px rgba(0, 255, 0, 0.5); }
+
+        .code-content {
+            padding: 15px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            color: var(--text-green);
+        }
+
+        /* Raw Report Fallback */
+        .raw-report {
+            background: #000;
+            border: 1px solid var(--border-green);
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            color: var(--text-green);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 30px;
+            border-top: 2px solid var(--border-green);
+        }
+
+        .footer-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 30px;
+            border: 2px solid var(--border-green);
+            background: rgba(0, 255, 0, 0.05);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.9em;
+            letter-spacing: 2px;
+            box-shadow: var(--glow-green);
+        }
+
+        .footer-author {
+            margin-top: 15px;
+            font-size: 0.85em;
+            opacity: 0.7;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--border-green); }
+
+        @media (max-width: 600px) {
+            .header h1 { font-size: 1.8em; }
+            .tabs-grid { grid-template-columns: 1fr; }
+            .tab-number { font-size: 2.5em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="matrix-bg"></div>
+    
+    <div class="container">
+        <div class="header">
+            <div class="header-icon">🐛</div>
+            <h1>Bug Hunt Agent</h1>
+            <p class="header-subtitle">// AI-POWERED DEBUGGING SYSTEM v2.0</p>
+            <div class="tech-badge">
+                <span>⚡</span>
+                <span>POWERED BY ZYPHER AGENT FRAMEWORK</span>
+            </div>
+        </div>
+
+        <div class="input-section">
+            <div class="input-group">
+                <label class="input-label">
+                    <span>📁</span>
+                    UPLOAD CODE FILES (OPTIONAL)
+                </label>
+                <div class="file-upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📄</div>
+                    <div>[ CLICK TO UPLOAD OR DRAG & DROP ]</div>
+                    <div style="font-size: 0.8em; opacity: 0.6; margin-top: 5px;">
+                        .js .ts .py .java .go .rs .cpp .c
+                    </div>
+                    <input type="file" id="fileInput" multiple accept=".js,.ts,.jsx,.tsx,.py,.java,.cpp,.c,.go,.rs,.rb,.php">
+                </div>
+                <div class="file-list" id="fileList"></div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">
+                    <span>🐛</span>
+                    DESCRIBE THE BUG
+                </label>
+                <textarea id="bugDescription" placeholder=">> Example: My /api/register endpoint returns 500 error..."></textarea>
+            </div>
+
+            <button id="huntButton" class="hunt-button" onclick="startBugHunt()">
+                <span>🔍</span>
+                <span>INITIATE BUG HUNT</span>
+            </button>
+        </div>
+
+        <div id="progressSection" class="progress-section">
+            <div class="section-title">
+                <span>⚡</span>
+                AGENT ACTIVITY LOG
+            </div>
+            <div id="progressLog" class="progress-log"></div>
+        </div>
+
+        <div id="resultsSection" class="results-section">
+            <div class="results-header">
+                <div class="results-title">📊 BUG HUNT RESULTS</div>
+                <div class="summary-text" id="summaryText"></div>
+                <div class="tabs-grid">
+                    <div class="tab-card bugs active" id="bugsTab" onclick="showPanel('bugs')">
+                        <div class="tab-icon">🐛</div>
+                        <div class="tab-number" id="bugsCount">0</div>
+                        <div class="tab-label">Bugs Found</div>
+                        <div class="tab-hint">[ CLICK TO VIEW ]</div>
+                    </div>
+                    <div class="tab-card fixes" id="fixesTab" onclick="showPanel('fixes')">
+                        <div class="tab-icon">✨</div>
+                        <div class="tab-number" id="fixesCount">0</div>
+                        <div class="tab-label">Fixes Applied</div>
+                        <div class="tab-hint">[ CLICK TO VIEW ]</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bugs Panel -->
+            <div id="bugsPanel" class="content-panel active">
+                <div class="panel-title">🐛 BUGS IDENTIFIED</div>
+                <div id="bugsList" class="bug-list"></div>
+            </div>
+
+            <!-- Fixes Panel -->
+            <div id="fixesPanel" class="content-panel">
+                <div class="panel-title">✨ FIXED CODE</div>
+                <div class="code-container">
+                    <div class="code-header">
+                        <span class="code-title">📄 Complete Fixed Version</span>
+                        <button class="copy-btn" onclick="copyCode()">📋 COPY CODE</button>
+                    </div>
+                    <pre class="code-content" id="fixedCode"></pre>
+                </div>
+            </div>
+
+            <!-- Raw Report Fallback -->
+            <div id="rawPanel" class="content-panel">
+                <div class="panel-title">📋 RAW ANALYSIS REPORT</div>
+                <div class="raw-report" id="rawReport"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="footer-brand">
+                <span>🤖</span>
+                <span>ZYPHER AGENT + CLAUDE SONNET 4.5</span>
+            </div>
+            <div class="footer-author">
+                CORESPEED TECHNICAL ASSESSMENT | MINGFAN XIE
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let resultData = null;
+
+        const progressLog = document.getElementById('progressLog');
+        const progressSection = document.getElementById('progressSection');
+        const resultsSection = document.getElementById('resultsSection');
+        const huntButton = document.getElementById('huntButton');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const dropZone = document.getElementById('dropZone');
+
+        fileInput.addEventListener('change', updateFileList);
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('has-files');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            if (fileInput.files.length === 0) dropZone.classList.remove('has-files');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileInput.files = e.dataTransfer.files;
+            updateFileList();
+        });
+
+        function updateFileList() {
+            const files = Array.from(fileInput.files);
+            if (files.length > 0) {
+                dropZone.classList.add('has-files');
+                fileList.innerHTML = files.map(f => `<span class="file-tag">✓ ${f.name}</span>`).join('');
+            } else {
+                dropZone.classList.remove('has-files');
+                fileList.innerHTML = '';
+            }
+        }
+
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const icons = { success: '✓', error: '✗', warning: '⚠', info: '▸', working: '' };
+            
+            if (type === 'working') {
+                entry.innerHTML = `<span class="log-spinner"></span><span>${message}</span>`;
+            } else {
+                entry.innerHTML = `<span>${icons[type]}</span><span>${message}</span>`;
+            }
+            
+            progressLog.appendChild(entry);
+            progressLog.scrollTop = progressLog.scrollHeight;
+        }
+
+        function showPanel(panel) {
+            document.getElementById('bugsTab').classList.remove('active');
+            document.getElementById('fixesTab').classList.remove('active');
+            document.getElementById('bugsPanel').classList.remove('active');
+            document.getElementById('fixesPanel').classList.remove('active');
+            document.getElementById('rawPanel').classList.remove('active');
+
+            if (panel === 'bugs') {
+                document.getElementById('bugsTab').classList.add('active');
+                document.getElementById('bugsPanel').classList.add('active');
+            } else if (panel === 'fixes') {
+                document.getElementById('fixesTab').classList.add('active');
+                document.getElementById('fixesPanel').classList.add('active');
+            } else {
+                document.getElementById('rawPanel').classList.add('active');
+            }
+        }
+
+        function copyCode() {
+            const code = document.getElementById('fixedCode').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = '✓ COPIED!';
+                setTimeout(() => btn.textContent = '📋 COPY CODE', 2000);
+            });
+        }
+
+        async function startBugHunt() {
+            const bugDescription = document.getElementById('bugDescription').value.trim();
+            if (!bugDescription) {
+                alert('Please describe the bug!');
+                return;
+            }
+
+            progressLog.innerHTML = '';
+            progressSection.classList.add('active');
+            resultsSection.classList.remove('active');
+            huntButton.disabled = true;
+            huntButton.innerHTML = '<span class="spinner"></span><span>HUNTING...</span>';
+
+            addLog('Initializing Bug Hunt Agent...', 'info');
+
+            const formData = new FormData();
+            formData.append('description', bugDescription);
+
+            const files = fileInput.files;
+            for (let i = 0; i < files.length; i++) {
+                const content = await files[i].text();
+                formData.append('files', JSON.stringify({ name: files[i].name, content }));
+            }
+
+            try {
+                const response = await fetch('/api/hunt', { method: 'POST', body: formData });
+                if (!response.ok) throw new Error('Failed to start');
+
+                const { sessionId } = await response.json();
+                eventSource = new EventSource(`/api/stream/${sessionId}`);
+
+                eventSource.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    
+                    switch(data.type) {
+                        case 'log':
+                            addLog(data.message, data.level || 'info');
+                            break;
+                        case 'progress':
+                            addLog(data.message, 'working');
+                            break;
+                        case 'result':
+                            showResults(data);
+                            eventSource.close();
+                            resetButton();
+                            break;
+                        case 'error':
+                            addLog(data.message, 'error');
+                            eventSource.close();
+                            resetButton();
+                            break;
+                    }
+                };
+
+                eventSource.onerror = () => {
+                    eventSource.close();
+                    resetButton();
+                };
+            } catch (error) {
+                addLog(`Error: ${error.message}`, 'error');
+                resetButton();
+            }
+        }
+
+        function resetButton() {
+            huntButton.disabled = false;
+            huntButton.innerHTML = '<span>🔍</span><span>INITIATE BUG HUNT</span>';
+        }
+
+        function showResults(data) {
+            addLog('Bug hunt completed!', 'success');
+            resultData = data;
+            
+            resultsSection.classList.add('active');
+            
+            // Update counts with animation
+            animateNumber('bugsCount', data.bugsFound || 0);
+            animateNumber('fixesCount', data.fixesApplied || 0);
+            
+            // Summary
+            document.getElementById('summaryText').textContent = data.summary || '';
+            
+            // Render bugs list
+            const bugsList = document.getElementById('bugsList');
+            if (data.bugs && data.bugs.length > 0) {
+                bugsList.innerHTML = data.bugs.map(bug => `
+                    <div class="bug-item">
+                        <div class="bug-header">
+                            <span class="bug-title">#${bug.id} ${bug.title}</span>
+                            <span class="bug-severity ${(bug.severity || 'medium').toLowerCase()}">${bug.severity || 'Medium'}</span>
+                        </div>
+                        <div class="bug-location">📍 ${bug.location || 'Unknown location'}</div>
+                        <div class="bug-problem">${bug.problem || ''}</div>
+                        ${bug.rootCause ? `<div class="bug-cause">💡 Root Cause: ${bug.rootCause}</div>` : ''}
+                    </div>
+                `).join('');
+            } else {
+                bugsList.innerHTML = '<div style="text-align: center; padding: 20px; opacity: 0.7;">No structured bug data available</div>';
+            }
+            
+            // Fixed code
+            const fixedCode = document.getElementById('fixedCode');
+            if (data.fixedCode) {
+                fixedCode.textContent = data.fixedCode;
+            } else {
+                fixedCode.textContent = 'No fixed code available';
+            }
+            
+            // Raw report fallback
+            if (data.rawReport) {
+                document.getElementById('rawReport').textContent = data.rawReport;
+            }
+            
+            // Show bugs panel by default
+            showPanel('bugs');
+            
+            setTimeout(() => {
+                resultsSection.scrollIntoView({ behavior: 'smooth' });
+            }, 300);
+        }
+
+        function animateNumber(elementId, target) {
+            const element = document.getElementById(elementId);
+            let current = 0;
+            const increment = Math.max(1, Math.ceil(target / 15));
+            const interval = setInterval(() => {
+                current += increment;
+                if (current >= target) {
+                    current = target;
+                    clearInterval(interval);
+                }
+                element.textContent = current;
+            }, 50);
+        }
+    </script>
+</body>
+</html>
